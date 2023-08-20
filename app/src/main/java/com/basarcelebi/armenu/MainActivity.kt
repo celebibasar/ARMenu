@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,9 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Placeable
+
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
+
 import androidx.compose.ui.unit.dp
 import com.basarcelebi.armenu.ui.theme.ARMenuTheme
 import com.basarcelebi.armenu.ui.theme.Translucent
@@ -48,7 +49,14 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Box(modifier = Modifier.fillMaxSize())
                     {
-                        Menu(modifier = Modifier.align(Alignment.BottomCenter))
+                        val currentModel = remember {
+                            mutableStateOf("burger")
+                        }
+                        ArScreen(currentModel.value)
+                        Menu(modifier = Modifier.align(Alignment.BottomCenter)){
+                            currentModel.value = it
+
+                        }
                     }
                 }
             }
@@ -58,7 +66,7 @@ class MainActivity : ComponentActivity() {
 
 
 @Composable
-fun Menu(modifier: Modifier)
+fun Menu(modifier: Modifier, onClick:(String)->Unit)
 {
     var currentIndex by remember {
         mutableStateOf(0)
@@ -73,6 +81,7 @@ fun Menu(modifier: Modifier)
     fun updateIndex(offset:Int)
     {
         currentIndex = (itemsList.size + currentIndex + offset) % itemsList.size
+        onClick(itemsList[currentIndex].name)
     }
     Row(modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -111,7 +120,7 @@ fun CircularImage(
 }
 
 @Composable
-fun ArScreen() {
+fun ArScreen(model: String) {
     val nodes = remember {
         mutableListOf<ArNode>()
     }
@@ -121,26 +130,49 @@ fun ArScreen() {
     val placeModelButton = remember {
         mutableStateOf(false)
     }
-    ARScene(modifier = Modifier.fillMaxSize(),
-        nodes = nodes,
-        planeRenderer = true,
-        onCreate = {arSceneView -> arSceneView.lightEstimationMode = Config.LightEstimationMode.DISABLED
-        arSceneView.planeRenderer.isShadowReceiver = false
-        modelNode.value= ArModelNode(arSceneView.engine,PlacementMode.INSTANT).apply {
-            loadModelGlbAsync(
-                glbFileLocation = "",
+    Box(modifier = Modifier.fillMaxSize()){
+        ARScene(
+            modifier = Modifier.fillMaxSize(),
+            nodes = nodes,
+            planeRenderer = true,
+            onCreate = {arSceneView ->
+                arSceneView.lightEstimationMode = Config.LightEstimationMode.DISABLED
+                arSceneView.planeRenderer.isShadowReceiver = false
+                modelNode.value = ArModelNode(arSceneView.engine,PlacementMode.INSTANT).apply {
+                    loadModelGlbAsync(
+                        glbFileLocation = "models/${model}.glb",
+                        scaleToUnits = 0.8f
+                    ){
 
-            ){
+                    }
+                    onAnchorChanged = {
+                        placeModelButton.value = !isAnchored
+                    }
+                    onHitResult = {node, hitResult ->
+                        placeModelButton.value = node.isTracking
+                    }
 
+                }
+                nodes.add(modelNode.value!!)
+            },
+            onSessionCreate = {
+                planeRenderer.isVisible = false
             }
-            onAnchorChanged = {
-                
-            }
-            onHitResult = {node, hitResult ->  }
-            nodes.add(modelNode.value!!)
-        }
-        }
         )
+        if(placeModelButton.value){
+            Button(onClick = {
+                modelNode.value?.anchor()
+            }, modifier = Modifier.align(Alignment.Center)) {
+                Text(text = "Place It")
+            }
+        }
+    }
+    LaunchedEffect(key1 = model){
+        modelNode.value?.loadModelGlbAsync(
+            glbFileLocation = "models/${model}.glb"
+        )
+    }
+
     
 }
 
